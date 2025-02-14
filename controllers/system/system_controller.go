@@ -1705,8 +1705,7 @@ func (r *SystemReconciler) Reconcile(ctx context.Context, request ctrl.Request) 
 		return ctrl.Result{}, nil
 	}
 
-	err, scopeChanged := r.UpdateDeploymentScope(instance)
-	if err != nil {
+	if err, _ := r.UpdateDeploymentScope(instance); err != nil {
 		return reconcile.Result{}, err
 	}
 
@@ -1719,32 +1718,6 @@ func (r *SystemReconciler) Reconcile(ctx context.Context, request ctrl.Request) 
 		if err != nil {
 			return reconcile.Result{}, err
 		}
-	}
-
-	// TODO(wasnio): get rid of this block once migration from helm is done
-	// The status reaches its desired status post reconciled
-	if instance.Status.ObservedGeneration == instance.ObjectMeta.Generation &&
-		instance.Status.Reconciled &&
-		platformClient != nil &&
-		!scopeChanged &&
-		!factory {
-		if !r.CloudManager.GetSystemReady(instance.Namespace) {
-			r.CloudManager.SetSystemReady(instance.Namespace, true)
-			logSystem.Info(
-				"system controller is reconciled, but in the last reconcile it failed to notify other controllers",
-			)
-			err := r.CloudManager.NotifySystemDependencies(instance.Namespace)
-			if err != nil {
-				// Revert to not-ready so that when we reconcile the system
-				// resource again we will push the change out to all other
-				// reconcilers again.
-				r.CloudManager.SetSystemReady(instance.Namespace, false)
-			}
-			return reconcile.Result{}, err
-		}
-
-		logSystem.V(2).Info("reconcile finished, desired state reached after reconciled.")
-		return reconcile.Result{}, nil
 	}
 
 	// Filter out certificates with type other than "ssl_ca"
